@@ -1,0 +1,24 @@
+{
+  "name": "dsh-ui-background",
+  "description": "Web 界面美化插件：本地图片背景、背景透明度、字体颜色与字体大小调节。",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [],
+      "immediately": true
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "MIT"
+}
