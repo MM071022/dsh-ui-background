@@ -8,6 +8,13 @@ const code = fs.readFileSync(clientPath, "utf8");
 
 let captured = null;
 const windowStub = {
+  _listeners: {},
+  addEventListener(ev, fn) { (this._listeners[ev] ??= []).push(fn); },
+  removeEventListener(ev, fn) {
+    const list = this._listeners[ev] ?? [];
+    const index = list.indexOf(fn);
+    if (index !== -1) list.splice(index, 1);
+  },
   __ModuleLoader__: {
     load(handoff) { captured = handoff; }
   }
@@ -48,6 +55,8 @@ const saved = {
   getComputedStyle: globalThis.getComputedStyle, localStorage: globalThis.localStorage,
   alert: globalThis.alert, FileReader: globalThis.FileReader, Image: globalThis.Image
 };
+const oldConsoleError = console.error;
+const initializationErrors = [];
 globalThis.window = windowStub;
 globalThis.document = documentStub;
 globalThis.getComputedStyle = getComputedStyleStub;
@@ -67,11 +76,15 @@ globalThis.localStorage = {
 globalThis.alert = () => {};
 globalThis.FileReader = class {};
 globalThis.Image = class {};
+console.error = (...args) => initializationErrors.push(args.map(String).join(" "));
 
 try {
   (0, eval)(code);
   const mod = captured.factory(() => { throw new Error("unexpected require"); });
   mod.apply({ on() {} });
+  if (initializationErrors.length) {
+    throw new Error("client initialization logged errors: " + initializationErrors.join(" | "));
+  }
 
   const css = documentStub.getElementById("dsh-ui-background-style").textContent;
   const checks = [
@@ -94,5 +107,6 @@ try {
   console.log(fail === 0 ? "ALL CSS CHECKS PASSED" : fail + " CHECKS FAILED");
   process.exit(fail === 0 ? 0 : 1);
 } finally {
+  console.error = oldConsoleError;
   Object.assign(globalThis, saved);
 }

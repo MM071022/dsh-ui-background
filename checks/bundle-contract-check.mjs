@@ -10,6 +10,13 @@ const code = fs.readFileSync(clientPath, "utf8");
 
 let captured = null;
 const windowStub = {
+  _listeners: {},
+  addEventListener(ev, fn) { (this._listeners[ev] ??= []).push(fn); },
+  removeEventListener(ev, fn) {
+    const list = this._listeners[ev] ?? [];
+    const index = list.indexOf(fn);
+    if (index !== -1) list.splice(index, 1);
+  },
   __ModuleLoader__: {
     load(handoff) {
       captured = handoff;
@@ -64,6 +71,8 @@ const oldWindow = globalThis.window;
 const oldDocument = globalThis.document;
 const oldGetComputedStyle = globalThis.getComputedStyle;
 const oldLocalStorage = globalThis.localStorage;
+const oldConsoleError = console.error;
+const initializationErrors = [];
 
 globalThis.window = windowStub;
 globalThis.document = documentStub;
@@ -77,6 +86,7 @@ globalThis.localStorage = {
 globalThis.alert = () => {};
 globalThis.FileReader = class {};
 globalThis.Image = class {};
+console.error = (...args) => initializationErrors.push(args.map(String).join(" "));
 
 try {
   // eslint-disable-next-line no-eval
@@ -94,6 +104,9 @@ try {
 
   const ctxStub = { on() {} };
   mod.apply(ctxStub);
+  if (initializationErrors.length) {
+    throw new Error("client initialization logged errors: " + initializationErrors.join(" | "));
+  }
   console.log("apply() ran without throwing");
 
   const panel = documentStub.getElementById("dsh-ui-background-panel");
@@ -109,4 +122,5 @@ try {
   globalThis.document = oldDocument;
   globalThis.getComputedStyle = oldGetComputedStyle;
   globalThis.localStorage = oldLocalStorage;
+  console.error = oldConsoleError;
 }

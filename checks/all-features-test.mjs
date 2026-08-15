@@ -44,6 +44,8 @@ function makeEnv(options = {}) {
   const intervals = [];
   const cleared = [];
   const windowListeners = {};
+  const mutationObservers = [];
+  let documentScanCount = 0;
   let disposeFn = null;
 
   const win = {
@@ -83,7 +85,16 @@ function makeEnv(options = {}) {
         }
       },
       querySelector(sel) { (this._qs[sel] ??= makeEl("div")); return this._qs[sel]; },
-      querySelectorAll() { return []; }, closest() { return null; }, click() {}, focus() {}
+      querySelectorAll(sel) {
+        if (sel !== "*") return [];
+        const found = [];
+        const visit = (node) => {
+          for (const child of node.children) { found.push(child); visit(child); }
+        };
+        visit(this);
+        return found;
+      },
+      closest() { return null; }, click() {}, focus() {}
     };
     els.push(el);
     return el;
@@ -99,7 +110,9 @@ function makeEnv(options = {}) {
     readyState: "complete", head: makeEl("head"), documentElement: makeEl("html"), body,
     createElement(tag) { return makeEl(tag); },
     getElementById(id) { return els.find((e) => e.id === id) ?? null; },
-    addEventListener() {}, querySelectorAll: () => els, querySelector: () => null
+    addEventListener() {},
+    querySelectorAll() { documentScanCount++; return els; },
+    querySelector: () => null
   };
   const gcs = (el) => ({ color: "rgb(17,17,17)", getPropertyValue(name) { return (el._vars && el._vars[name]) || ""; } });
 
@@ -110,7 +123,8 @@ function makeEnv(options = {}) {
     window: globalThis.window, document: globalThis.document,
     getComputedStyle: globalThis.getComputedStyle, localStorage: globalThis.localStorage,
     alert: globalThis.alert, prompt: globalThis.prompt, FileReader: globalThis.FileReader,
-    Image: globalThis.Image, setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval
+    Image: globalThis.Image, MutationObserver: globalThis.MutationObserver,
+    setInterval: globalThis.setInterval, clearInterval: globalThis.clearInterval
   };
   globalThis.window = win;
   globalThis.document = doc;
@@ -137,6 +151,12 @@ function makeEnv(options = {}) {
     get src() { return this._src; }
   }
   globalThis.Image = FakeImage;
+  globalThis.MutationObserver = class {
+    constructor(callback) { this.callback = callback; this.active = false; mutationObservers.push(this); }
+    observe() { this.active = true; }
+    disconnect() { this.active = false; }
+    fire(records) { if (this.active) this.callback(records); }
+  };
   globalThis.setInterval = (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; };
   globalThis.clearInterval = (id) => { cleared.push(id); };
   try {
@@ -158,7 +178,17 @@ function makeEnv(options = {}) {
     overlay: () => doc.getElementById("dsh-ui-background-overlay"),
     stored: () => JSON.parse(storage["dsh-ui-background:settings:v1"] || "null"),
     get storage() { return storage; },
-    intervals, cleared, windowListeners,
+    intervals, cleared, windowListeners, mutationObservers,
+    get documentScanCount() { return documentScanCount; },
+    remountChatScope() {
+      cr.remove();
+      const wrapper = makeEl("section");
+      const replacement = makeEl("div", { vars: { "--dsh-chat-content-width": "748px" } });
+      wrapper.appendChild(replacement);
+      body.appendChild(wrapper);
+      mutationObservers[0].fire([{ addedNodes: [wrapper] }]);
+      return replacement;
+    },
     dispose: () => { if (disposeFn) disposeFn(); },
     input: (key, value) => {
       const panel = doc.getElementById("dsh-ui-background-panel");
@@ -540,7 +570,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   parsed.blur = 999;
   parsed.chatFontSize = 99;
   parsed.fillMode = "bogus";
+  parsed.chatFontColor = "red;}body{display:none}";
+  parsed.sidebarFontColor = "#12zz99";
   parsed.images.push({ id: "bad", data: "not-data-url", name: "x" }); // invalid -> dropped
+  parsed.images.push({ id: "bad-data", data: "data:text/html;base64,PGgxPmJhZDwvaDE+", name: "x" });
   parsed.images.push({ id: "url", url: "https://x.com/a.png", width: 100, height: 50, name: "url" }); // valid url
   h3.panel().querySelector('[data-set="importText"]').value = JSON.stringify(parsed);
   h3.clickAct("importApply");
@@ -551,12 +584,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   check("I7 import fallback fillMode", s.fillMode === "cover");
   check("I8 import drops invalid image", !s.images.some((im) => im.data === "not-data-url"));
   check("I9 import keeps url image", s.images.some((im) => im.url === "https://x.com/a.png"));
-  check("I10 import status", h3.panel().querySelector('[data-val="ioStatus"]').textContent.includes("导入成功"));
+  check("I10 import rejects CSS color injection", s.chatFontColor === "" && s.sidebarFontColor === "");
+  check("I11 import rejects non-image data URL", !s.images.some((im) => im.data && im.data.startsWith("data:text/")));
+  check("I12 import status", h3.panel().querySelector('[data-val="ioStatus"]').textContent.includes("导入成功"));
 
   // invalid json
   h3.panel().querySelector('[data-set="importText"]').value = "{oops";
   h3.clickAct("importApply");
-  check("I11 import bad json", h3.panel().querySelector('[data-val="ioStatus"]').textContent.includes("导入失败"));
+  check("I13 import bad json", h3.panel().querySelector('[data-val="ioStatus"]').textContent.includes("导入失败"));
   env3.dispose();
 }
 
@@ -661,8 +696,12 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   check("M6 bg-base transparent absent without image", !env4.helpers.css().includes("--dsw-alias-bg-base: transparent"));
   env4.dispose();
 
-  // MutationObserver guard present (boot handles late-mounted roots)
-  check("M7 observer guard in source", code.includes("typeof MutationObserver"));
+  // Scope discovery scans the whole document once, then only added subtrees.
+  const scansBefore = env4.helpers.documentScanCount;
+  const replacement = env4.helpers.remountChatScope();
+  check("M7 remounted chat scope tagged", replacement.getAttribute("data-dsh-ui-scope") === "chat");
+  check("M8 mutation avoids whole-document scan", env4.helpers.documentScanCount === scansBefore);
+  check("M9 observer remains active for future remounts", env4.helpers.mutationObservers[0].active);
 }
 
 console.log(`\n==== ${passes} PASS / ${failures} FAIL ====`);
