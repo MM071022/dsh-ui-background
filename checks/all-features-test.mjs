@@ -414,6 +414,59 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   env.dispose();
 }
 
+// ══════════════════ F2. background scope (仅对话区 / 整体贯穿) ══════════════════
+{
+  // default: chat scope — no sidebar transparency rule
+  const env = makeEnv({ seed: v4seed() });
+  check("F2a default chat scope, no sidebar rule", !env.helpers.css().includes("--dsw-specific-sidebar-fill: transparent"));
+  env.dispose();
+
+  // all scope + image: sidebar becomes fully transparent
+  const env2 = makeEnv({ seed: v4seed({ bgScope: "all" }) });
+  const css2 = env2.helpers.css();
+  check("F2b all scope -> sidebar transparent", css2.includes('[data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: transparent !important}'));
+  check("F2c all scope dark rule", css2.includes('body[data-ds-dark-theme] [data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: transparent !important}'));
+  env2.dispose();
+
+  // all scope + glass: transparent wins (rule emitted after glass)
+  const env3 = makeEnv({ seed: v4seed({ bgScope: "all", glass: true }) });
+  const css3 = env3.helpers.css();
+  const glassIdx = css3.indexOf("rgba(255,255,255,0.5) !important");
+  const transparentIdx = css3.indexOf("--dsw-specific-sidebar-fill: transparent");
+  check("F2d transparent after glass (wins)", transparentIdx > glassIdx, "glass@" + glassIdx + " transparent@" + transparentIdx);
+  env3.dispose();
+
+  // all scope without image: no rule
+  const env4 = makeEnv({ seed: v4seed({ bgScope: "all", images: [] }) });
+  check("F2e all scope no image -> no rule", !env4.helpers.css().includes("--dsw-specific-sidebar-fill: transparent"));
+  env4.dispose();
+
+  // import sanitize: accepts only valid values
+  const env5 = makeEnv({ seed: v4seed() });
+  const h5 = env5.helpers;
+  h5.clickAct("export");
+  const parsed5 = JSON.parse(h5.panel().querySelector('[data-set="importText"]').value);
+  parsed5.bgScope = "all";
+  h5.panel().querySelector('[data-set="importText"]').value = JSON.stringify(parsed5);
+  h5.clickAct("importApply");
+  await wait(5);
+  check("F2f import accepts bgScope all", env5.helpers.stored().bgScope === "all");
+  parsed5.bgScope = "bogus";
+  h5.panel().querySelector('[data-set="importText"]').value = JSON.stringify(parsed5);
+  h5.clickAct("importApply");
+  await wait(5);
+  check("F2g import rejects invalid bgScope", env5.helpers.stored().bgScope === "chat");
+  env5.dispose();
+
+  // panel select toggles scope
+  const env6 = makeEnv({ seed: v4seed() });
+  env6.helpers.change("scope", "all");
+  check("F2h select -> all scope rule", env6.helpers.css().includes("--dsw-specific-sidebar-fill: transparent"));
+  env6.helpers.change("scope", "chat");
+  check("F2i select -> chat scope no rule", !env6.helpers.css().includes("--dsw-specific-sidebar-fill: transparent"));
+  env6.dispose();
+}
+
 // ══════════════════ G. glass ══════════════════
 {
   const env = makeEnv({ seed: v4seed({ glass: true }) });

@@ -13,7 +13,7 @@ const PORT = Number(process.env.DSH_E2E_PORT || 9223);
 const PROFILE = `${HERE}/e2e-profile`;
 const SHOT_DIR = `${HERE}/../screenshots/e2e`;
 const TMP_IMG = `${HERE}/e2e-bg.png`;
-const URL = process.env.DSH_URL || "http://127.0.0.1:3080/";
+const TARGET_URL = process.env.DSH_URL || "http://127.0.0.1:3080/";
 
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 // a small colorful test wallpaper (solid gradient-ish png 32x32)
@@ -35,7 +35,7 @@ const chrome = spawn(CHROME, [
   `--remote-debugging-port=${PORT}`,
   `--user-data-dir=${PROFILE}`,
   "--window-size=1400,900",
-  URL
+  TARGET_URL
 ], { stdio: "ignore", detached: false });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -173,6 +173,17 @@ async function main() {
     const glassCss = await evaluate('document.getElementById("dsh-ui-background-style").textContent');
     check("E2E13 glass rules", glassCss.includes("--dsw-specific-bubble: rgba(255,255,255,0.5) !important"));
     await shot("03-styled-glass");
+
+    // background scope: 整体贯穿 —— sidebar becomes fully transparent
+    await evaluate(setSelect("scope", "all"));
+    const sideFill = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\')).backgroundColor');
+    check("E2E13b bg scope all -> sidebar transparent", sideFill === "rgba(0, 0, 0, 0)", sideFill);
+    const scopeCss = await evaluate('document.getElementById("dsh-ui-background-style").textContent');
+    check("E2E13c scope rule emitted", scopeCss.includes("--dsw-specific-sidebar-fill: transparent !important"));
+    await shot("03b-bg-scope-all");
+    await evaluate(setSelect("scope", "chat"));
+    const sideFill2 = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\')).backgroundColor');
+    check("E2E13d scope chat -> sidebar has fill again", sideFill2 !== "rgba(0, 0, 0, 0)", sideFill2);
 
     // font color (chat) — probe element INSIDE chat scope resolves the overridden token
     await evaluate('(() => { const el = document.querySelector(\'#dsh-ui-background-panel [data-set="chatColor"]\'); el.value = "#e6194b"; el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()');
