@@ -421,11 +421,11 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   check("F2a default chat scope, no sidebar rule", !env.helpers.css().includes("--dsw-specific-sidebar-fill: transparent"));
   env.dispose();
 
-  // all scope + image: sidebar becomes fully transparent
+  // all scope + image: sidebar column AND root become fully transparent (body-level rule)
   const env2 = makeEnv({ seed: v4seed({ bgScope: "all" }) });
   const css2 = env2.helpers.css();
-  check("F2b all scope -> sidebar transparent", css2.includes('[data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: transparent !important}'));
-  check("F2c all scope dark rule", css2.includes('body[data-ds-dark-theme] [data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: transparent !important}'));
+  check("F2b all scope -> body-level transparent rule", css2.includes('body, body[data-ds-dark-theme]{--dsw-specific-sidebar-fill: transparent !important}'));
+  check("F2c all scope dark selector present", css2.includes('body[data-ds-dark-theme]{--dsw-specific-sidebar-fill: transparent !important}'));
   env2.dispose();
 
   // all scope + glass: transparent wins (rule emitted after glass)
@@ -473,7 +473,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const css = env.helpers.css();
   check("G1 glass bubble light", css.includes("--dsw-specific-bubble: rgba(255,255,255,0.5) !important"));
   check("G2 glass bubble dark", css.includes("body[data-ds-dark-theme] [data-dsh-ui-scope=\"chat\"]{--dsw-specific-bubble: rgba(21,21,23,0.55) !important"));
-  check("G3 glass sidebar", css.includes('[data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: rgba(255,255,255,0.5) !important'));
+  check("G3 glass sidebar body-level", css.includes('body{--dsw-specific-sidebar-fill: rgba(255,255,255,0.5) !important}'));
   check("G4 glass input-major", css.includes("--dsw-specific-input-major: rgba(255,255,255,0.55) !important"));
   check("G5 glass code block", css.includes("--dsw-alias-markdown-code-block: rgba(255,255,255,0.72) !important"));
   env.dispose();

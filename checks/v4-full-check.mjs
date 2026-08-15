@@ -129,7 +129,7 @@ try {
     check("P2 sidebar zoom", css.includes("zoom: 1.2 !important") && css.includes("width: calc(100% / 1.2)"));
     check("P2 glass bubble light", css.includes("--dsw-specific-bubble: rgba(255,255,255,0.5) !important"));
     check("P2 glass bubble dark", css.includes("body[data-ds-dark-theme] [data-dsh-ui-scope=\"chat\"]{--dsw-specific-bubble: rgba(21,21,23,0.55) !important"));
-    check("P2 glass sidebar", css.includes('[data-dsh-ui-scope="sidebar"]{--dsw-specific-sidebar-fill: rgba(255,255,255,0.5) !important}'));
+    check("P2 glass sidebar", css.includes('body{--dsw-specific-sidebar-fill: rgba(255,255,255,0.5) !important}'));
     const layer = env.doc.getElementById("dsh-ui-background-layer");
     check("P2 layer image A", layer && layer.style.backgroundImage === 'url("data:image/png;base64,AA")');
     check("P2 blur filter", layer && layer.style.filter === "blur(8px)");

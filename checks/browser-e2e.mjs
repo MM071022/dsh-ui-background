@@ -174,16 +174,19 @@ async function main() {
     check("E2E13 glass rules", glassCss.includes("--dsw-specific-bubble: rgba(255,255,255,0.5) !important"));
     await shot("03-styled-glass");
 
-    // background scope: 整体贯穿 —— sidebar becomes fully transparent
+    // background scope: 整体贯穿 —— sidebar column AND root become fully transparent
     await evaluate(setSelect("scope", "all"));
     const sideFill = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\')).backgroundColor');
     check("E2E13b bg scope all -> sidebar transparent", sideFill === "rgba(0, 0, 0, 0)", sideFill);
+    const colFill = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\').parentElement.parentElement).backgroundColor');
+    check("E2E13b2 bg scope all -> sidebar column transparent", colFill === "rgba(0, 0, 0, 0)", colFill);
     const scopeCss = await evaluate('document.getElementById("dsh-ui-background-style").textContent');
     check("E2E13c scope rule emitted", scopeCss.includes("--dsw-specific-sidebar-fill: transparent !important"));
     await shot("03b-bg-scope-all");
     await evaluate(setSelect("scope", "chat"));
     const sideFill2 = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\')).backgroundColor');
-    check("E2E13d scope chat -> sidebar has fill again", sideFill2 !== "rgba(0, 0, 0, 0)", sideFill2);
+    const colFill2 = await evaluate('getComputedStyle(document.querySelector(\'[data-dsh-ui-scope="sidebar"]\').parentElement.parentElement).backgroundColor');
+    check("E2E13d scope chat -> fills back", sideFill2 !== "rgba(0, 0, 0, 0)" && colFill2 !== "rgba(0, 0, 0, 0)", sideFill2 + " / " + colFill2);
 
     // font color (chat) — probe element INSIDE chat scope resolves the overridden token
     await evaluate('(() => { const el = document.querySelector(\'#dsh-ui-background-panel [data-set="chatColor"]\'); el.value = "#e6194b"; el.dispatchEvent(new Event("input", { bubbles: true })); return true; })()');
