@@ -36,7 +36,9 @@ DSH 组件类名是构建期哈希（跨版本不稳定），因此插件在运�
 - 聊天区根节点定义了 `--dsh-chat-content-width`（`dsh-client-ui-conversation` 中唯一一处定义）；
 - 侧边栏根节点定义了 `--dsh-sidebar-inline-padding`（`dsh-client-ui-sidebar` 中唯一一处定义）。
 
-检测逻辑：元素上某自定义属性的计算值与其父元素不同，则该属性定义在该元素上；配合唯一定义点即可定位根节点，并打上 `data-dsh-ui-scope="chat|sidebar"` 供 CSS 选择器使用。应用挂载晚于 DOMContentLoaded 时，用 MutationObserver 等待根节点出现后补打标记。
+检测逻辑：元素上某自定义属性的计算值与其父元素不同，则该属性定义在该元素上；配合唯一定义点即可定位根节点，并打上 `data-dsh-ui-scope="chat|sidebar"` 供 CSS 选择器使用。首次加载只进行一次全页检测；之后 MutationObserver 仅检查新增子树，在 DSH 重挂载聊天区或侧边栏时补打标记，避免流式输出触发反复全页扫描。
+
+这套定位依赖 DSH 当前提供的 `--dsh-*` / `--dsw-*` CSS token。DSH 升级后若局部样式失效，请先关闭插件并报告对应 DSH 版本；插件不会因找不到作用域而持续扫描整个页面。
 
 ## 目录结构
 
@@ -66,14 +68,22 @@ dsh-ui-background/
 
 仓库 `checks/` 目录下提供了两套自动化测试（路径均为仓库内相对路径，克隆后可直接运行）：
 
-- **Node 仿真套件**（无浏览器依赖）：`checks/all-features-test.mjs`（100 项：契约/引导/作用域/
+- **Node 仿真套件**（无浏览器依赖）：`checks/all-features-test.mjs`（113 项：契约/引导/作用域/
   迁移/多图/轮播/样式/毛玻璃/字体/导入导出/重置/拖拽/生命周期）、`checks/v4-full-check.mjs`、
   `checks/scoped-css-check.mjs`、`checks/bundle-contract-check.mjs`、`checks/css-generation-check.mjs`。
   运行：`node checks/all-features-test.mjs`
 - **真实浏览器 E2E**（需要 headless Chrome + 运行中的 `dsh web`）：
-  `checks/browser-e2e.mjs`（24 项，通过 Chrome DevTools Protocol 驱动真实 GUI 交互并截图到
+  `checks/browser-e2e.mjs`（28 项，通过 Chrome DevTools Protocol 驱动真实 GUI 交互并截图到
   `screenshots/e2e/`）。运行：`node checks/browser-e2e.mjs`
   （可用环境变量 `DSH_URL` 指定 GUI 地址、`CHROME_PATH` 指定浏览器路径。）
+
+每次 push 和 pull request 都会通过 GitHub Actions 自动运行全部 Node 仿真与契约检查。
+
+## 数据与隐私
+
+- 本地图片会在浏览器中压缩并以 data URL 保存到当前站点的 `localStorage`，不会由插件主动上传；浏览器通常只有约 5MB 可用空间。
+- 导出的配置 JSON 包含本地图片数据。分享配置前请确认其中没有私人图片；配置导入最多接受 20 张有效的 `data:image/*` 或 HTTP(S) 图片。
+- 网络图片由浏览器直接请求第三方地址，对方可能看到你的 IP、请求时间和浏览器请求信息；地址失效或防盗链也会导致背景无法显示。
 
 ## 安装（web profile）
 
