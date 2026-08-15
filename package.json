@@ -6,9 +6,9 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/manjiayu20071022/dsh-ui-background.git"
+    "url": "git+https://github.com/MM071022/dsh-ui-background.git"
   },
-  "homepage": "https://github.com/manjiayu20071022/dsh-ui-background",
+  "homepage": "https://github.com/MM071022/dsh-ui-background",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
